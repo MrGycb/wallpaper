@@ -1,0 +1,58 @@
+# Animated Wallpaper
+
+Переносимое приложение на C# для Windows, которое запускает выбранное видео как анимированные обои рабочего стола.
+
+## Что реализовано
+
+- совместимость с Windows 7, 8, 10 и 11 через `.NET Framework 4.6.1`
+- воспроизведение через `LibVLC`, чтобы стабильнее работать с тяжелыми файлами и разными кодеками
+- запуск без установщика: приложение открывается через `DesktopAnimatedWallpaper.exe`
+- черная тема по умолчанию и переключение на светлую тему
+- интерфейс в стиле liquid glass
+- выбор видео без показа полного пути в поле ввода
+- звук всегда отключен
+- автоматическое масштабирование видео под размер рабочего стола
+- архитектура `Model-View-Presenter`
+
+## Сборка
+
+```powershell
+$msbuild = (Get-Command MSBuild.exe).Source
+dotnet restore .\DesktopAnimatedWallpaper.csproj
+& $msbuild `
+  .\DesktopAnimatedWallpaper.csproj `
+  /t:Build `
+  /p:Configuration=Release `
+  /p:OutDir=.\artifacts\publish\
+```
+
+Или используйте:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\publish.ps1
+```
+
+## Что попадет в релиз
+
+В папке `.\artifacts\publish\` будут:
+
+- `DesktopAnimatedWallpaper.exe`
+- `LibVLCSharp*.dll`
+- служебные `dll`
+- папка `libvlc\` с нативными библиотеками VLC для `win-x64` и `win-x86`
+
+Это не установка. Просто запускайте `DesktopAnimatedWallpaper.exe`, не отделяя его от соседних файлов и папки `libvlc`.
+
+## Запуск
+
+1. Запустите `DesktopAnimatedWallpaper.exe`.
+2. Нажмите `Добавить видео`.
+3. Убедитесь, что карточка файла показывает `Файл добавлен`.
+4. Нажмите `Запустить обои`.
+5. Для остановки используйте кнопку `Остановить`.
+
+## Форматы
+
+Поддерживаются `MP4`, `MKV`, `AVI`, `MOV`, `M4V`, `WMV`.
+
+Для тяжелых роликов лучше всего работают локальные файлы на быстром диске. `LibVLC` позволяет запускать файлы в несколько гигабайт стабильнее, чем системный плеер Windows.
