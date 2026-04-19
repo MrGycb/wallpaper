@@ -16,6 +16,8 @@ internal sealed class MainForm : Form, IMainView
     private readonly ThemeButton _browseButton;
     private readonly ThemeButton _applyButton;
     private readonly ThemeButton _stopButton;
+    private readonly NotifyIcon _notifyIcon;
+    private readonly ContextMenuStrip _trayMenu;
     private readonly Label _titleLabel;
     private readonly Label _subtitleLabel;
     private readonly Label _fileSectionLabel;
@@ -35,6 +37,7 @@ internal sealed class MainForm : Form, IMainView
         AutoScaleMode = AutoScaleMode.Dpi;
         Font = new Font("Segoe UI", 10F, FontStyle.Regular, GraphicsUnit.Point);
         Text = "Animated Wallpaper";
+        Icon = LoadApplicationIcon();
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(860, 560);
         Size = new Size(960, 648);
@@ -93,6 +96,25 @@ internal sealed class MainForm : Form, IMainView
 
         _stopButton = CreateButton("Остановить", 144, 44);
         _stopButton.Click += (_, _) => StopRequested?.Invoke(this, EventArgs.Empty);
+
+        _trayMenu = new ContextMenuStrip();
+        _trayMenu.Items.Add("Открыть", null, (_, _) => RestoreFromTray());
+        _trayMenu.Items.Add("Выход", null, (_, _) => Close());
+
+        _notifyIcon = new NotifyIcon
+        {
+            ContextMenuStrip = _trayMenu,
+            Icon = Icon,
+            Text = "Animated Wallpaper",
+            Visible = false,
+        };
+        _notifyIcon.MouseDoubleClick += (_, args) =>
+        {
+            if (args.Button == MouseButtons.Left)
+            {
+                RestoreFromTray();
+            }
+        };
 
         _headerCard.Controls.AddRange(new Control[] { _titleLabel, _subtitleLabel, _themeToggleButton });
         _fileCard.Controls.AddRange(new Control[] { _fileSectionLabel, _fileStateLabel, _fileHintLabel });
@@ -198,6 +220,33 @@ internal sealed class MainForm : Form, IMainView
         e.Graphics.FillRectangle(brush, ClientRectangle);
     }
 
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+
+        if (WindowState == FormWindowState.Minimized)
+        {
+            HideToTray();
+        }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        _notifyIcon.Visible = false;
+        base.OnFormClosing(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _notifyIcon.Dispose();
+            _trayMenu.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
     private static GlassCardPanel CreateCard(Padding margin)
     {
         return new GlassCardPanel
@@ -238,6 +287,27 @@ internal sealed class MainForm : Form, IMainView
             Height = height,
             Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold, GraphicsUnit.Point),
         };
+    }
+
+    private static Icon LoadApplicationIcon()
+    {
+        return Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+    }
+
+    private void HideToTray()
+    {
+        _notifyIcon.Visible = true;
+        ShowInTaskbar = false;
+        Hide();
+    }
+
+    private void RestoreFromTray()
+    {
+        Show();
+        ShowInTaskbar = true;
+        WindowState = FormWindowState.Normal;
+        _notifyIcon.Visible = false;
+        Activate();
     }
 
     private void UpdateSelectedFileView()

@@ -11,6 +11,7 @@
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <AssemblyName>DesktopAnimatedWallpaper</AssemblyName>
     <RootNamespace>DesktopAnimatedWallpaper</RootNamespace>
+    <ApplicationIcon>Assets\wallpaper.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
