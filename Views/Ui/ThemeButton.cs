@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace DesktopAnimatedWallpaper.Views.Ui;
@@ -11,6 +12,13 @@ internal sealed class ThemeButton : Button
 
     public ThemeButton()
     {
+        SetStyle(
+            ControlStyles.UserPaint |
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer |
+            ControlStyles.ResizeRedraw,
+            true);
+
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
         FlatAppearance.MouseDownBackColor = Color.Empty;
@@ -43,7 +51,9 @@ internal sealed class ThemeButton : Button
         }
 
         using var path = RoundRectangleHelper.Create(new Rectangle(0, 0, Width - 1, Height - 1), CornerRadius);
+        var previousRegion = Region;
         Region = new Region(path);
+        previousRegion?.Dispose();
     }
 
     protected override void OnMouseEnter(EventArgs e)
@@ -79,6 +89,38 @@ internal sealed class ThemeButton : Button
     {
         ApplyState();
         base.OnEnabledChanged(e);
+    }
+
+    protected override bool ShowFocusCues => false;
+
+    protected override void OnPaint(PaintEventArgs pevent)
+    {
+        if (Width <= 1 || Height <= 1)
+        {
+            return;
+        }
+
+        pevent.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+        var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
+        using var path = RoundRectangleHelper.Create(bounds, CornerRadius);
+        using var fillBrush = new SolidBrush(BackColor);
+
+        pevent.Graphics.FillPath(fillBrush, path);
+
+        if (_style.BorderColor.A > 0)
+        {
+            using var borderPen = new Pen(BackColor, 1f);
+            pevent.Graphics.DrawPath(borderPen, path);
+        }
+
+        const TextFormatFlags textFlags =
+            TextFormatFlags.HorizontalCenter |
+            TextFormatFlags.VerticalCenter |
+            TextFormatFlags.EndEllipsis |
+            TextFormatFlags.SingleLine;
+
+        TextRenderer.DrawText(pevent.Graphics, Text, Font, ClientRectangle, ForeColor, textFlags);
     }
 
     private void ApplyState()
