@@ -14,9 +14,13 @@ internal sealed class WallpaperForm : Form
 
     private readonly LibVLC _libVlc;
     private readonly System.Windows.Forms.Timer _startupTimer;
+    private readonly PictureBox _gifView;
     private VideoView _videoView;
     private MediaPlayer _mediaPlayer;
     private Media? _media;
+    private Image? _gifImage;
+    private MemoryStream? _gifStream;
+    private NativeDesktopHost.DesktopHostAttachment _desktopAttachment;
     private bool _desktopAttached;
     private bool _startupRecoveryAttempted;
     private string? _currentVideoPath;
@@ -45,6 +49,9 @@ internal sealed class WallpaperForm : Form
         _mediaPlayer = CreateMediaPlayer();
         _videoView.MediaPlayer = _mediaPlayer;
         Controls.Add(_videoView);
+
+        _gifView = CreateGifView();
+        Controls.Add(_gifView);
 
         _startupTimer = new System.Windows.Forms.Timer
         {
@@ -86,6 +93,13 @@ internal sealed class WallpaperForm : Form
         IsPlaying = true;
 
         PrepareWindowForLoading();
+
+        if (IsGifFile(videoPath))
+        {
+            StartGifPlayback(videoPath);
+            return;
+        }
+
         StartPlayback(videoPath);
     }
 
@@ -94,8 +108,9 @@ internal sealed class WallpaperForm : Form
         _startupTimer.Stop();
         IsPlaying = false;
         _currentVideoPath = null;
+        StopGifPlayback();
         StopAndResetMediaPlayer();
-        Hide();
+        RestoreDesktopWallpaper();
     }
 
     protected override void Dispose(bool disposing)
@@ -105,11 +120,14 @@ internal sealed class WallpaperForm : Form
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             _startupTimer.Tick -= OnStartupTimerTick;
             _startupTimer.Dispose();
+            RestoreDesktopWallpaper();
             DetachMediaPlayerEvents(_mediaPlayer);
             _media?.Dispose();
+            StopGifPlayback();
             _videoView.MediaPlayer = null;
             _mediaPlayer.Dispose();
             _videoView.Dispose();
+            _gifView.Dispose();
             _libVlc.Dispose();
         }
 
@@ -120,13 +138,10 @@ internal sealed class WallpaperForm : Form
     {
         ResizeToDesktop();
 
-        if (_desktopAttached)
-        {
-            NativeDesktopHost.DetachFromDesktop(Handle, GetDesktopBounds());
-            _desktopAttached = false;
-        }
+        DetachFromDesktopIfNeeded();
 
         StopAndResetMediaPlayer();
+        StopGifPlayback();
 
         if (!IsHandleCreated || !Visible)
         {
@@ -143,6 +158,10 @@ internal sealed class WallpaperForm : Form
 
     private void StartPlayback(string videoPath)
     {
+        _gifView.Visible = false;
+        _videoView.Visible = true;
+        _videoView.BringToFront();
+
         _media?.Dispose();
         _media = new Media(_libVlc, new Uri(videoPath));
         _media.AddOption(":no-audio");
@@ -165,6 +184,21 @@ internal sealed class WallpaperForm : Form
         {
             RecoverOrFail("LibVLC не смог начать воспроизведение.");
         }
+    }
+
+    private void StartGifPlayback(string gifPath)
+    {
+        _startupTimer.Stop();
+        StopGifPlayback();
+
+        _gifStream = new MemoryStream(File.ReadAllBytes(gifPath));
+        _gifImage = Image.FromStream(_gifStream);
+        _gifView.Image = _gifImage;
+        _gifView.Visible = true;
+        _gifView.BringToFront();
+        _videoView.Visible = false;
+
+        FinalizeStartup();
     }
 
     private void StopAndResetMediaPlayer()
@@ -206,6 +240,27 @@ internal sealed class WallpaperForm : Form
             Dock = DockStyle.Fill,
             BackColor = Color.Black,
         };
+    }
+
+    private static PictureBox CreateGifView()
+    {
+        return new PictureBox
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Black,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Visible = false,
+        };
+    }
+
+    private void StopGifPlayback()
+    {
+        _gifView.Image = null;
+        _gifView.Visible = false;
+        _gifImage?.Dispose();
+        _gifImage = null;
+        _gifStream?.Dispose();
+        _gifStream = null;
     }
 
     private void DetachMediaPlayerEvents(MediaPlayer mediaPlayer)
@@ -269,7 +324,7 @@ internal sealed class WallpaperForm : Form
     {
         if (!_desktopAttached)
         {
-            NativeDesktopHost.AttachToDesktop(Handle, GetDesktopBounds());
+            _desktopAttachment = NativeDesktopHost.AttachToDesktop(Handle, GetDesktopBounds());
             _desktopAttached = true;
         }
 
@@ -301,7 +356,7 @@ internal sealed class WallpaperForm : Form
     {
         IsPlaying = false;
         StopAndResetMediaPlayer();
-        Hide();
+        RestoreDesktopWallpaper();
         PlaybackFailed?.Invoke(this, new WallpaperPlaybackFailedEventArgs(message));
     }
 
@@ -319,6 +374,31 @@ internal sealed class WallpaperForm : Form
     private static Rectangle GetDesktopBounds()
     {
         return SystemInformation.VirtualScreen;
+    }
+
+    private void RestoreDesktopWallpaper()
+    {
+        DetachFromDesktopIfNeeded();
+        Hide();
+        Opacity = 1;
+        NativeDesktopHost.RefreshDesktop();
+    }
+
+    private void DetachFromDesktopIfNeeded()
+    {
+        if (!_desktopAttached || !IsHandleCreated)
+        {
+            return;
+        }
+
+        NativeDesktopHost.DetachFromDesktop(Handle, GetDesktopBounds(), _desktopAttachment);
+        _desktopAttachment = default;
+        _desktopAttached = false;
+    }
+
+    private static bool IsGifFile(string filePath)
+    {
+        return string.Equals(Path.GetExtension(filePath), ".gif", StringComparison.OrdinalIgnoreCase);
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e)

@@ -180,7 +180,7 @@ internal sealed class MainForm : Form, IMainView
         using var dialog = new OpenFileDialog
         {
             Title = "Выбор видео для обоев",
-            Filter = "Видео (*.mp4;*.wmv;*.avi;*.mov;*.m4v;*.mkv)|*.mp4;*.wmv;*.avi;*.mov;*.m4v;*.mkv|Все файлы (*.*)|*.*",
+            Filter = "Видео и GIF (*.mp4;*.wmv;*.avi;*.mov;*.m4v;*.mkv;*.gif)|*.mp4;*.wmv;*.avi;*.mov;*.m4v;*.mkv;*.gif|Все файлы (*.*)|*.*",
             CheckFileExists = true,
             Multiselect = false,
             RestoreDirectory = true,
